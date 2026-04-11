@@ -1,11 +1,12 @@
 //@external modules
 const express = require("express");
 const App = require("./src/app");
+const { DB } = require("./src/config/init");
 
 const app = express();
 
 const startServer = async() => {
-
+    await DB();
     await App(app);
 
     app.listen(process.env.PORT,() => {
