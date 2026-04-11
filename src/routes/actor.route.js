@@ -1,7 +1,12 @@
+const { authMiddleware } = require("../middlewares/init");
+
 const actorRoute = require("express").Router();
 
-actorRoute.get("/", (req, res) => {
-    res.send("Actor Route");
+actorRoute.use(authMiddleware.isLogin)
+
+actorRoute.post("/", (req, res) => {
+    console.log("Actor details", req.account);
+    res.send("Actor details", req.account);
 });
 
 module.exports = actorRoute;

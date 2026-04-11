@@ -100,7 +100,6 @@ class AuthService {
       const token = this.generateToken(newActor);
 
       return {
-        id: newActor.id,
         contact: newActor.contact,
         role: newActor.role,
         token
@@ -137,7 +136,6 @@ class AuthService {
       const token = this.generateToken(actor);
 
       return {
-        id: actor.id,
         contact: actor.contact,
         role: actor.role,
         token
