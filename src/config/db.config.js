@@ -1,36 +1,42 @@
-//@external module
-const { Pool } = require("pg");
+require('dotenv').config();
+const { Sequelize } = require('sequelize');
 
-const pool = new Pool({
+const sequelize = new Sequelize(
+  process.env.DB_NAME,
+  process.env.DB_USER,
+  process.env.DB_PASSWORD,
+  {
     host: process.env.DB_HOST,
     port: process.env.DB_PORT,
-    database: process.env.DB_NAME,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    max: 20,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000,
-});
+    dialect: 'postgres',
+    logging: false,
+    pool: {
+      max: 20,
+      min: 0,
+      idle: 30000,
+      acquire: 20000,
+    },
+    define: {
+      timestamps: true,
+      underscored: false,
+      freezeTableName: true,
+    },
+  }
+);
 
-//@exports
-module.exports = async () => {
-    try {
+const DB = async () => {
+  try {
+    await sequelize.authenticate();
+    console.log("Database connected successfully");
 
-        // checking connection
-        const client = await pool.connect();
-        console.log("Database connected successfully");
-        client.release();
+    await sequelize.sync();
+    console.log("Database synced successfully");
 
-        // handle events
-        pool.on("error", (err) => {
-            console.error("Unexpected error on idle client", err);
-            process.exit(1);
-        });
-
-        return pool;
-
-    } catch (error) {
-        console.error("Database connection error:", error.message);
-        process.exit(1);
-    }
+    return sequelize;
+  } catch (error) {
+    console.error("Database initialization error:", error);
+    process.exit(1);
+  }
 };
+
+module.exports = { sequelize, DB };
