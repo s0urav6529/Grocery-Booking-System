@@ -99,16 +99,76 @@ const getItemBySlugRules = [
     .withMessage('Slug must contain only lowercase letters, numbers, and hyphens'),
 ];
 
-const updateQuantityRules = [
+const addStockRules = [
   param('id')
     .isInt({ min: 1 })
     .withMessage('Item ID must be a positive integer'),
 
-  body('quantityChange')
+  body('quantity')
     .notEmpty()
-    .withMessage('quantityChange is required')
-    .isInt()
-    .withMessage('quantityChange must be an integer'),
+    .withMessage('Quantity is required')
+    .isInt({ min: 1 })
+    .withMessage('Quantity must be a positive integer'),
+
+  body('reason')
+    .optional()
+    .trim()
+    .isLength({ max: 255 })
+    .withMessage('Reason must not exceed 255 characters'),
+];
+
+const reduceStockRules = [
+  param('id')
+    .isInt({ min: 1 })
+    .withMessage('Item ID must be a positive integer'),
+
+  body('quantity')
+    .notEmpty()
+    .withMessage('Quantity is required')
+    .isInt({ min: 1 })
+    .withMessage('Quantity must be a positive integer'),
+
+  body('reason')
+    .optional()
+    .trim()
+    .isLength({ max: 255 })
+    .withMessage('Reason must not exceed 255 characters'),
+];
+
+const setStockRules = [
+  param('id')
+    .isInt({ min: 1 })
+    .withMessage('Item ID must be a positive integer'),
+
+  body('quantity')
+    .notEmpty()
+    .withMessage('Quantity is required')
+    .isInt({ min: 0 })
+    .withMessage('Quantity must be a non-negative integer'),
+
+  body('reason')
+    .optional()
+    .trim()
+    .isLength({ max: 255 })
+    .withMessage('Reason must not exceed 255 characters'),
+];
+
+const getInventoryHistoryRules = [
+  param('id')
+    .isInt({ min: 1 })
+    .withMessage('Item ID must be a positive integer'),
+
+  query('page')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Page must be a positive integer')
+    .toInt(),
+
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 100 })
+    .withMessage('Limit must be between 1 and 100')
+    .toInt(),
 ];
 
 const getItemsFilterRules = [
@@ -134,6 +194,9 @@ module.exports = {
   updateItemRules,
   getItemByIdRules,
   getItemBySlugRules,
-  updateQuantityRules,
+  addStockRules,
+  reduceStockRules,
+  setStockRules,
+  getInventoryHistoryRules,
   getItemsFilterRules,
 };

@@ -108,8 +108,6 @@ class ItemController {
     try {
       const { name, description, price, quantity, sku, unit, isActive } = req.body;
 
-      console.log('Creating item with data:', req.body);
-
       const newItem = await ItemService.createItem({
         name,
         description,
@@ -117,7 +115,7 @@ class ItemController {
         quantity,
         sku,
         unit,
-        isActive,
+        isActive
       });
 
       return res.status(201).json({
@@ -213,31 +211,32 @@ class ItemController {
   }
 
   /**
-   * Update item quantity
-   * @route PATCH /api/items/:id/quantity
+   * Add stock to item
+   * @route POST /api/items/:id/inventory/add
    * @access Admin only
    */
-  static async updateQuantity(req, res) {
+  static async addStock(req, res) {
     try {
       const { id } = req.params;
-      const { quantityChange } = req.body;
+      const { quantity, reason } = req.body;
+      const adminId = req.account.id;
 
-      if (quantityChange === undefined) {
+      if (!quantity || quantity <= 0) {
         return res.status(400).json({
           success: false,
-          message: 'quantityChange is required',
+          message: 'Valid quantity is required',
         });
       }
 
-      const updatedItem = await ItemService.updateQuantity(id, parseInt(quantityChange));
+      const result = await ItemService.addStock(id, parseInt(quantity), adminId, reason);
 
       return res.status(200).json({
         success: true,
-        message: 'Item quantity updated successfully',
-        data: updatedItem,
+        message: 'Stock added successfully',
+        data: result,
       });
     } catch (error) {
-      console.error('Error updating quantity:', error);
+      console.error('Error adding stock:', error);
 
       if (error.status) {
         return res.status(error.status).json({
@@ -245,6 +244,125 @@ class ItemController {
           message: error.message,
         });
       }
+
+      return res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: error.message,
+      });
+    }
+  }
+
+  /**
+   * Reduce stock from item
+   * @route POST /api/items/:id/inventory/reduce
+   * @access Admin only
+   */
+  static async reduceStock(req, res) {
+    try {
+      const { id } = req.params;
+      const { quantity, reason } = req.body;
+      const adminId = req.account.id; // From auth middleware
+
+      if (!quantity || quantity <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Valid quantity is required',
+        });
+      }
+
+      const result = await ItemService.reduceStock(id, parseInt(quantity), adminId, reason);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Stock reduced successfully',
+        data: result,
+      });
+    } catch (error) {
+      console.error('Error reducing stock:', error);
+
+      if (error.status) {
+        return res.status(error.status).json({
+          success: false,
+          message: error.message,
+        });
+      }
+
+      return res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: error.message,
+      });
+    }
+  }
+
+  /**
+   * Set item stock quantity
+   * @route PUT /api/items/:id/inventory
+   * @access Admin only
+   */
+  static async setStock(req, res) {
+    try {
+      const { id } = req.params;
+      const { quantity, reason } = req.body;
+      const adminId = req.account.id; // From auth middleware
+
+      if (quantity === undefined || quantity < 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Valid quantity (>= 0) is required',
+        });
+      }
+
+      const result = await ItemService.setStock(id, parseInt(quantity), adminId, reason);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Stock set successfully',
+        data: result,
+      });
+    } catch (error) {
+      console.error('Error setting stock:', error);
+
+      if (error.status) {
+        return res.status(error.status).json({
+          success: false,
+          message: error.message,
+        });
+      }
+
+      return res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: error.message,
+      });
+    }
+  }
+
+  /**
+   * Get inventory history for an item
+   * @route GET /api/items/:id/inventory/history
+   * @access Admin only
+   */
+  static async getInventoryHistory(req, res) {
+    try {
+      const { id } = req.params;
+      const { page, limit } = req.query;
+
+      const pagination = {
+        page: page || 1,
+        limit: limit || 20,
+      };
+
+      const result = await ItemService.getInventoryHistory(id, pagination);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Inventory history retrieved successfully',
+        ...result,
+      });
+    } catch (error) {
+      console.error('Error fetching inventory history:', error);
 
       return res.status(500).json({
         success: false,

@@ -57,14 +57,40 @@ itemRoute
         ItemController.deleteItem
     );
 
-// Update item quantity
+// Add stock to item
 itemRoute
-    .patch(
-        '/:id/quantity',
-        authMiddleware.requireAdmin,
-        itemRules.updateQuantityRules,
+    .route('/:id/inventory/add')
+    .post( authMiddleware.requireAdmin,
+        itemRules.addStockRules,
         validation.validate,
-        ItemController.updateQuantity
+        ItemController.addStock
+    );
+
+// Reduce stock from item
+itemRoute
+    .route('/:id/inventory/reduce')
+    .post( authMiddleware.requireAdmin,
+        itemRules.reduceStockRules,
+        validation.validate,
+        ItemController.reduceStock
+    );
+
+// Set item stock quantity
+itemRoute
+    .route('/:id/inventory')
+    .put( authMiddleware.requireAdmin,
+        itemRules.setStockRules,
+        validation.validate,
+        ItemController.setStock
+    );
+
+// Get inventory history for an item
+itemRoute
+    .route('/:id/inventory/history')
+    .get( authMiddleware.requireAdmin,
+        itemRules.getInventoryHistoryRules,
+        validation.validate,
+        ItemController.getInventoryHistory
     );
 
 module.exports = itemRoute;

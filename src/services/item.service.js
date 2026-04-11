@@ -1,4 +1,4 @@
-const { Item } = require('../models/init');
+const { Item, InventoryHistory } = require('../models/init');
 const { generateSlug } = require('../utils/slug.utils');
 
 class ItemService {
@@ -152,7 +152,7 @@ class ItemService {
                 quantity: parseInt(itemData.quantity) || 0,
                 sku: itemData.sku || null,
                 unit: itemData.unit || 'pcs',
-                isActive: itemData.isActive !== undefined ? itemData.isActive : true,
+                isActive: itemData.isActive !== undefined ? itemData.isActive : true
             });
 
             return newItem;
@@ -270,25 +270,178 @@ class ItemService {
         }
     }
     /**
-     * Update item quantity (for inventory management)
+     * Add stock to item inventory
      */
-    static async updateQuantity(itemId, quantityChange) {
+    static async addStock(itemId, quantity, adminId, reason = 'Stock addition') {
         try {
             const item = await this.getItemById(itemId);
-            const newQuantity = item.quantity + quantityChange;
+
+            if (quantity <= 0) {
+                throw {
+                    status: 400,
+                    message: 'Quantity to add must be positive',
+                };
+            }
+
+            const previousQuantity = item.quantity;
+            const newQuantity = previousQuantity + quantity;
+
+            // Update item quantity
+            item.quantity = newQuantity;
+            await item.save();
+
+            // Record inventory history
+            await InventoryHistory.create({
+                itemId,
+                action: 'add',
+                quantityChange: quantity,
+                previousQuantity,
+                newQuantity,
+                reason,
+                performedBy: adminId,
+            });
+
+            return {
+                item,
+                previousQuantity,
+                newQuantity,
+                quantityAdded: quantity,
+            };
+        } catch (error) {
+            throw error;
+        }
+    }
+
+    /**
+     * Reduce stock from item inventory
+     */
+    static async reduceStock(itemId, quantity, adminId, reason = 'Stock reduction') {
+        try {
+            const item = await this.getItemById(itemId);
+
+            if (quantity <= 0) {
+                throw {
+                    status: 400,
+                    message: 'Quantity to reduce must be positive',
+                };
+            }
+
+            const previousQuantity = item.quantity;
+            const newQuantity = previousQuantity - quantity;
 
             if (newQuantity < 0) {
                 throw {
                     status: 400,
-                    message: 'Insufficient stock',
+                    message: 'Insufficient stock available',
                 };
             }
 
+            // Update item quantity
             item.quantity = newQuantity;
             await item.save();
-            return item;
+
+            // Record inventory history
+            await InventoryHistory.create({
+                itemId,
+                action: 'reduce',
+                quantityChange: -quantity, // Negative for reduction
+                previousQuantity,
+                newQuantity,
+                reason,
+                performedBy: adminId,
+            });
+
+            return {
+                item,
+                previousQuantity,
+                newQuantity,
+                quantityReduced: quantity,
+            };
         } catch (error) {
             throw error;
+        }
+    }
+
+    /**
+     * Set item quantity directly
+     */
+    static async setStock(itemId, quantity, adminId, reason = 'Stock adjustment') {
+        try {
+            const item = await this.getItemById(itemId);
+
+            if (quantity < 0) {
+                throw {
+                    status: 400,
+                    message: 'Quantity cannot be negative',
+                };
+            }
+
+            const previousQuantity = item.quantity;
+
+            // Update item quantity
+            item.quantity = quantity;
+            await item.save();
+
+            // Record inventory history
+            await InventoryHistory.create({
+                itemId,
+                action: 'set',
+                quantityChange: quantity - previousQuantity,
+                previousQuantity,
+                newQuantity: quantity,
+                reason,
+                performedBy: adminId,
+            });
+
+            return {
+                item,
+                previousQuantity,
+                newQuantity: quantity,
+                quantityChange: quantity - previousQuantity,
+            };
+        } catch (error) {
+            throw error;
+        }
+    }
+
+    /**
+     * Get inventory history for an item
+     */
+    static async getInventoryHistory(itemId, pagination = {}) {
+        try {
+            const page = pagination.page || 1;
+            const limit = pagination.limit || 20;
+            const offset = (page - 1) * limit;
+
+            const { count, rows } = await InventoryHistory.findAndCountAll({
+                where: { itemId },
+                include: [
+                    {
+                        model: Item,
+                        as: 'item',
+                        attributes: ['name', 'sku'],
+                    },
+                ],
+                order: [['createdAt', 'DESC']],
+                limit,
+                offset,
+            });
+
+            const totalPages = Math.ceil(count / limit);
+
+            return {
+                data: rows,
+                pagination: {
+                    page,
+                    limit,
+                    total: count,
+                    totalPages,
+                    hasNextPage: page < totalPages,
+                    hasPreviousPage: page > 1,
+                },
+            };
+        } catch (error) {
+            throw new Error(`Error fetching inventory history: ${error.message}`);
         }
     }
 }
