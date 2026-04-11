@@ -54,11 +54,12 @@ src/
    npm install
    ```
 
-3. Create a `.env` file in the root directory with the following variables:
+3. Copy the example environment file and update values:
+   ```bash
+   cp .env.example .env
    ```
-   NODE_ENV=development
-   PORT=3000
-   ```
+
+4. Update `.env` with your local database and JWT settings.
 
 ## Running the Application
 

@@ -14,6 +14,11 @@ InventoryHistory.belongsTo(Item, {
   as: 'item',
 });
 
+InventoryHistory.belongsTo(Actor, {
+  foreignKey: 'performedBy',
+  as: 'performer',
+});
+
 module.exports = {
   Actor,
   Item,
