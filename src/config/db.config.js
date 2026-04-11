@@ -29,7 +29,14 @@ const DB = async () => {
     await sequelize.authenticate();
     console.log("Database connected successfully");
 
-    await sequelize.sync();
+    // Import models
+    const { Actor, Item, InventoryHistory } = require('../models/init');
+
+    // Sync models in correct order (dependencies first)
+    await Actor.sync();
+    await Item.sync();
+    await InventoryHistory.sync();
+
     console.log("Database synced successfully");
 
     return sequelize;
