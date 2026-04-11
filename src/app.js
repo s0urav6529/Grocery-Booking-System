@@ -2,6 +2,7 @@
 const express = require("express");
 const cors = require("cors");
 const morgan = require('morgan');
+const { actorRoute } = require("./routes/init");
 const dotenv = require('dotenv').config();
 
 module.exports = async(app) => {
@@ -15,8 +16,10 @@ module.exports = async(app) => {
         app.use(morgan("dev"));
     }
 
+    app.use("/api/actors", actorRoute);
+
     // Health check endpoint
-    app.get("/health", (req, res) => {
+    app.get("/api/health", (req, res) => {
         res.status(200).json({
             success: true,
             message: "API is healthy"
