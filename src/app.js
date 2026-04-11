@@ -2,7 +2,7 @@
 const express = require("express");
 const cors = require("cors");
 const morgan = require('morgan');
-const { actorRoute } = require("./routes/init");
+const { actorRoute, authRoute, itemRoute } = require("./routes/init");
 const dotenv = require('dotenv').config();
 
 module.exports = async(app) => {
@@ -16,7 +16,9 @@ module.exports = async(app) => {
         app.use(morgan("dev"));
     }
 
+    app.use("/api/auth", authRoute);
     app.use("/api/actors", actorRoute);
+    app.use("/api/items", itemRoute);
 
     // Health check endpoint
     app.get("/api/health", (req, res) => {
