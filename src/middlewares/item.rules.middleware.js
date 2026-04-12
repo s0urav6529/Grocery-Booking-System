@@ -57,11 +57,6 @@ const updateItemRules = [
     .isFloat({ min: 0 })
     .withMessage('Price must be a positive number'),
 
-  body('quantity')
-    .optional()
-    .isInt({ min: 0 })
-    .withMessage('Quantity must be a non-negative integer'),
-
   body('description')
     .optional()
     .trim(),

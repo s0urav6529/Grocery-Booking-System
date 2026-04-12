@@ -1,5 +1,6 @@
 const { Item, InventoryHistory } = require('../models/init');
 const { generateSlug } = require('../utils/slug.utils');
+const { sequelize } = require('../config/db.config');
 
 class ItemService {
 
@@ -8,37 +9,37 @@ class ItemService {
      */
     static async getAllItems(filter = {}, pagination = {}) {
         try {
-        const query = {};
-        
-        if (filter.isActive !== undefined) {
-            query.isActive = filter.isActive;
-        }
+            const query = {};
 
-        // Handle pagination
-        const page = pagination.page || 1;
-        const limit = pagination.limit || 10;
-        const offset = (page - 1) * limit;
+            if (filter.isActive !== undefined) {
+                query.isActive = filter.isActive;
+            }
 
-        const { count, rows } = await Item.findAndCountAll({
-            where: query,
-            order: [['createdAt', 'DESC']],
-            limit,
-            offset,
-        });
+            // Handle pagination
+            const page = pagination.page || 1;
+            const limit = pagination.limit || 10;
+            const offset = (page - 1) * limit;
 
-        const totalPages = Math.ceil(count / limit);
-
-        return {
-            data: rows,
-            pagination: {
-                page,
+            const { count, rows } = await Item.findAndCountAll({
+                where: query,
+                order: [['createdAt', 'DESC']],
                 limit,
-                total: count,
-                totalPages,
-                hasNextPage: page < totalPages,
-                hasPreviousPage: page > 1,
-            },
-        };
+                offset,
+            });
+
+            const totalPages = Math.ceil(count / limit);
+
+            return {
+                data: rows,
+                pagination: {
+                    page,
+                    limit,
+                    total: count,
+                    totalPages,
+                    hasNextPage: page < totalPages,
+                    hasPreviousPage: page > 1,
+                },
+            };
         } catch (error) {
             throw new Error(`Error fetching items: ${error.message}`);
         }
@@ -83,8 +84,8 @@ class ItemService {
     /**
      * Create new item with slug generation and duplicate checks
      */
-    static async createItem(itemData) {
-
+    static async createItem(itemData, actorId) {
+        const transaction = await sequelize.transaction();
         try {
 
             // Validate required fields
@@ -116,7 +117,7 @@ class ItemService {
                     status: 400,
                     message: 'isActive is required',
                 };
-            
+
 
             // Check for duplicate SKU if provided
             if (itemData.sku) {
@@ -135,14 +136,12 @@ class ItemService {
             // Check if slug already exists and append counter if needed
             let counter = 1;
             let existingSlug = await Item.findOne({ where: { slug } });
-            
+
             while (existingSlug) {
                 slug = `${generateSlug(itemData.name)}-${counter}`;
                 existingSlug = await Item.findOne({ where: { slug } });
                 counter++;
             }
-
-            console.log('Final slug for new item:', slug);
 
             const newItem = await Item.create({
                 name: itemData.name,
@@ -153,10 +152,23 @@ class ItemService {
                 sku: itemData.sku || null,
                 unit: itemData.unit || 'pcs',
                 isActive: itemData.isActive !== undefined ? itemData.isActive : true
-            });
+            }, { transaction });
 
+            // create new inventory history record for initial stock
+            await InventoryHistory.create({
+                itemId: newItem.id,
+                action: 'add',
+                quantityChange: newItem.quantity,
+                previousQuantity: 0,
+                newQuantity: newItem.quantity,
+                reason: 'Initial stock on item creation',
+                performedBy: actorId || null, // Use the provided actor ID or set to null if not available
+            }, { transaction });
+
+            await transaction.commit();
             return newItem;
         } catch (error) {
+            if (transaction) await transaction.rollback();
             throw error;
         }
     }
@@ -182,14 +194,14 @@ class ItemService {
             // Update only provided fields
             if (updateData.name !== undefined) {
                 item.name = updateData.name;
-                
+
                 // Regenerate slug when name changes
                 let newSlug = generateSlug(updateData.name);
                 let counter = 1;
                 let existingSlug = await Item.findOne({
                     where: { slug: newSlug, id: { [require('sequelize').Op.ne]: itemId } },
                 });
-                
+
                 while (existingSlug) {
                     newSlug = `${generateSlug(updateData.name)}-${counter}`;
                     existingSlug = await Item.findOne({
@@ -197,13 +209,13 @@ class ItemService {
                     });
                     counter++;
                 }
-                
+
                 item.slug = newSlug;
             }
 
             if (updateData.description !== undefined) item.description = updateData.description;
             if (updateData.price !== undefined) item.price = parseFloat(updateData.price);
-            if (updateData.quantity !== undefined) item.quantity = parseInt(updateData.quantity);
+            // Quantity updates must use inventory endpoints only
             if (updateData.sku !== undefined) item.sku = updateData.sku;
             if (updateData.unit !== undefined) item.unit = updateData.unit;
             if (updateData.isActive !== undefined) item.isActive = updateData.isActive;
@@ -257,12 +269,12 @@ class ItemService {
             return {
                 data: rows,
                 pagination: {
-                page,
-                limit,
-                total: count,
-                totalPages,
-                hasNextPage: page < totalPages,
-                hasPreviousPage: page > 1,
+                    page,
+                    limit,
+                    total: count,
+                    totalPages,
+                    hasNextPage: page < totalPages,
+                    hasPreviousPage: page > 1,
                 },
             };
         } catch (error) {
@@ -273,6 +285,8 @@ class ItemService {
      * Add stock to item inventory
      */
     static async addStock(itemId, quantity, adminId, reason = 'Stock addition') {
+        const transaction = await sequelize.transaction();
+
         try {
             const item = await this.getItemById(itemId);
 
@@ -286,11 +300,9 @@ class ItemService {
             const previousQuantity = item.quantity;
             const newQuantity = previousQuantity + quantity;
 
-            // Update item quantity
             item.quantity = newQuantity;
-            await item.save();
+            await item.save({ transaction });
 
-            // Record inventory history
             await InventoryHistory.create({
                 itemId,
                 action: 'add',
@@ -299,7 +311,9 @@ class ItemService {
                 newQuantity,
                 reason,
                 performedBy: adminId,
-            });
+            }, { transaction });
+
+            await transaction.commit();
 
             return {
                 item,
@@ -308,6 +322,7 @@ class ItemService {
                 quantityAdded: quantity,
             };
         } catch (error) {
+            await transaction.rollback();
             throw error;
         }
     }
@@ -316,6 +331,8 @@ class ItemService {
      * Reduce stock from item inventory
      */
     static async reduceStock(itemId, quantity, adminId, reason = 'Stock reduction') {
+        const transaction = await sequelize.transaction();
+
         try {
             const item = await this.getItemById(itemId);
 
@@ -336,20 +353,20 @@ class ItemService {
                 };
             }
 
-            // Update item quantity
             item.quantity = newQuantity;
-            await item.save();
+            await item.save({ transaction });
 
-            // Record inventory history
             await InventoryHistory.create({
                 itemId,
                 action: 'reduce',
-                quantityChange: -quantity, // Negative for reduction
+                quantityChange: -quantity,
                 previousQuantity,
                 newQuantity,
                 reason,
                 performedBy: adminId,
-            });
+            }, { transaction });
+
+            await transaction.commit();
 
             return {
                 item,
@@ -358,6 +375,7 @@ class ItemService {
                 quantityReduced: quantity,
             };
         } catch (error) {
+            await transaction.rollback();
             throw error;
         }
     }
@@ -366,6 +384,8 @@ class ItemService {
      * Set item quantity directly
      */
     static async setStock(itemId, quantity, adminId, reason = 'Stock adjustment') {
+        const transaction = await sequelize.transaction();
+
         try {
             const item = await this.getItemById(itemId);
 
@@ -378,11 +398,9 @@ class ItemService {
 
             const previousQuantity = item.quantity;
 
-            // Update item quantity
             item.quantity = quantity;
-            await item.save();
+            await item.save({ transaction });
 
-            // Record inventory history
             await InventoryHistory.create({
                 itemId,
                 action: 'set',
@@ -391,7 +409,9 @@ class ItemService {
                 newQuantity: quantity,
                 reason,
                 performedBy: adminId,
-            });
+            }, { transaction });
+
+            await transaction.commit();
 
             return {
                 item,
@@ -400,6 +420,7 @@ class ItemService {
                 quantityChange: quantity - previousQuantity,
             };
         } catch (error) {
+            await transaction.rollback();
             throw error;
         }
     }
