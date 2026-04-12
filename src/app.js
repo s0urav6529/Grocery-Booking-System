@@ -17,7 +17,6 @@ module.exports = async(app) => {
         app.use(morgan("dev"));
     }
 
-    
     // Health check endpoint
     app.get("/api/health", (req, res) => {
         res.status(200).json({
@@ -26,6 +25,7 @@ module.exports = async(app) => {
         });
     });
     
+    // Apply API security middleware to all routes
     app
         .use(apiSecure.apiAuth)
         .use("/api/auth", authRoute)
