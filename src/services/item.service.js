@@ -1,5 +1,6 @@
 const { Item, InventoryHistory } = require('../models/init');
 const { generateSlug } = require('../utils/slug.utils');
+const { sequelize } = require('../config/db.config');
 
 class ItemService {
 
@@ -8,37 +9,37 @@ class ItemService {
      */
     static async getAllItems(filter = {}, pagination = {}) {
         try {
-        const query = {};
-        
-        if (filter.isActive !== undefined) {
-            query.isActive = filter.isActive;
-        }
+            const query = {};
 
-        // Handle pagination
-        const page = pagination.page || 1;
-        const limit = pagination.limit || 10;
-        const offset = (page - 1) * limit;
+            if (filter.isActive !== undefined) {
+                query.isActive = filter.isActive;
+            }
 
-        const { count, rows } = await Item.findAndCountAll({
-            where: query,
-            order: [['createdAt', 'DESC']],
-            limit,
-            offset,
-        });
+            // Handle pagination
+            const page = pagination.page || 1;
+            const limit = pagination.limit || 10;
+            const offset = (page - 1) * limit;
 
-        const totalPages = Math.ceil(count / limit);
-
-        return {
-            data: rows,
-            pagination: {
-                page,
+            const { count, rows } = await Item.findAndCountAll({
+                where: query,
+                order: [['createdAt', 'DESC']],
                 limit,
-                total: count,
-                totalPages,
-                hasNextPage: page < totalPages,
-                hasPreviousPage: page > 1,
-            },
-        };
+                offset,
+            });
+
+            const totalPages = Math.ceil(count / limit);
+
+            return {
+                data: rows,
+                pagination: {
+                    page,
+                    limit,
+                    total: count,
+                    totalPages,
+                    hasNextPage: page < totalPages,
+                    hasPreviousPage: page > 1,
+                },
+            };
         } catch (error) {
             throw new Error(`Error fetching items: ${error.message}`);
         }
@@ -84,7 +85,7 @@ class ItemService {
      * Create new item with slug generation and duplicate checks
      */
     static async createItem(itemData, actorId) {
-        let transaction;
+        const transaction = await sequelize.transaction();
         try {
 
             // Validate required fields
@@ -116,7 +117,7 @@ class ItemService {
                     status: 400,
                     message: 'isActive is required',
                 };
-            
+
 
             // Check for duplicate SKU if provided
             if (itemData.sku) {
@@ -135,14 +136,12 @@ class ItemService {
             // Check if slug already exists and append counter if needed
             let counter = 1;
             let existingSlug = await Item.findOne({ where: { slug } });
-            
+
             while (existingSlug) {
                 slug = `${generateSlug(itemData.name)}-${counter}`;
                 existingSlug = await Item.findOne({ where: { slug } });
                 counter++;
             }
-
-            transaction = await sequelize.transaction();
 
             const newItem = await Item.create({
                 name: itemData.name,
@@ -195,14 +194,14 @@ class ItemService {
             // Update only provided fields
             if (updateData.name !== undefined) {
                 item.name = updateData.name;
-                
+
                 // Regenerate slug when name changes
                 let newSlug = generateSlug(updateData.name);
                 let counter = 1;
                 let existingSlug = await Item.findOne({
                     where: { slug: newSlug, id: { [require('sequelize').Op.ne]: itemId } },
                 });
-                
+
                 while (existingSlug) {
                     newSlug = `${generateSlug(updateData.name)}-${counter}`;
                     existingSlug = await Item.findOne({
@@ -210,7 +209,7 @@ class ItemService {
                     });
                     counter++;
                 }
-                
+
                 item.slug = newSlug;
             }
 
@@ -270,12 +269,12 @@ class ItemService {
             return {
                 data: rows,
                 pagination: {
-                page,
-                limit,
-                total: count,
-                totalPages,
-                hasNextPage: page < totalPages,
-                hasPreviousPage: page > 1,
+                    page,
+                    limit,
+                    total: count,
+                    totalPages,
+                    hasNextPage: page < totalPages,
+                    hasPreviousPage: page > 1,
                 },
             };
         } catch (error) {
