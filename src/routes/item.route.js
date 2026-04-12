@@ -2,19 +2,31 @@ const itemRoute = require('express').Router();
 const ItemController = require('../controllers/item.controller');
 const { itemRules, validation, authMiddleware } = require('../middlewares/init');
 
-itemRoute.use(authMiddleware.isLogin);
-
+// Get all items with optional filters and pagination
+// public endpoint, no authentication required
 itemRoute
     .route('/')
-    // Get all items with optional filters and pagination
     .get(
-        authMiddleware.requireAdminAndUser,
         itemRules.getItemsFilterRules,
         validation.validate,
         ItemController.getAllItems
     )
-    // Create a new item
-    .post(
+
+// Get item by slug (public endpoint)
+itemRoute
+    .route('/slug/:slug')
+    .get(
+        itemRules.getItemBySlugRules,
+        validation.validate,
+        ItemController.getItemBySlug
+    );
+
+// All routes below require authentication
+itemRoute.use(authMiddleware.isLogin);
+
+itemRoute
+    .route('/')
+    .post(  // Admin only create item endpoint
         authMiddleware.requireAdmin,
         itemRules.createItemRules,
         validation.validate,
@@ -31,17 +43,8 @@ itemRoute
         ItemController.getItemById
     );
 
-// Get item by slug (admin and user)
-itemRoute
-    .route('/slug/:slug')
-    .get(
-        authMiddleware.requireAdminAndUser,
-        itemRules.getItemBySlugRules,
-        validation.validate,
-        ItemController.getItemBySlug
-    );
 
-// Update item
+// Update item and delete item (admin only)
 itemRoute
     .route('/:id')
     .patch(
@@ -57,7 +60,7 @@ itemRoute
         ItemController.deleteItem
     );
 
-// Add stock to item
+// Add stock to item (admin only)
 itemRoute
     .route('/:id/inventory/add')
     .post( authMiddleware.requireAdmin,
@@ -66,7 +69,7 @@ itemRoute
         ItemController.addStock
     );
 
-// Reduce stock from item
+// Reduce stock from item (admin only)
 itemRoute
     .route('/:id/inventory/reduce')
     .post( authMiddleware.requireAdmin,
@@ -75,7 +78,7 @@ itemRoute
         ItemController.reduceStock
     );
 
-// Set item stock quantity
+// Set item stock quantity (admin only)
 itemRoute
     .route('/:id/inventory')
     .put( authMiddleware.requireAdmin,
@@ -84,7 +87,7 @@ itemRoute
         ItemController.setStock
     );
 
-// Get inventory history for an item
+// Get inventory history for an item (admin only)
 itemRoute
     .route('/:id/inventory/history')
     .get( authMiddleware.requireAdmin,
