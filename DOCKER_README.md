@@ -91,6 +91,7 @@ docker-compose exec -T postgres psql -U postgres -d grocery_booking_db < backup.
 | `DB_PASSWORD` | Database password |
 | `JWT_SECRET` | - | JWT signing secret |
 | `JWT_EXPIRATION` | JWT token expiration |
+| `API_SECURE_KEY` | - | API security key |
 
 ### Database
 
