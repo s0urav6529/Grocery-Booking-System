@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: grocery-booking-db
+    restart: unless-stopped
+    env_file:
+      - .env.docker
+    environment:
+      - POSTGRES_DB
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - grocery-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Node.js Application
+  app:
+    build: .
+    container_name: grocery-booking-app
+    restart: unless-stopped
+    env_file:
+      - .env.docker
+    environment:
+      - NODE_ENV
+      - PORT
+      - DB_HOST
+      - DB_PORT
+      - DB_NAME
+      - DB_USER
+      - DB_PASSWORD
+      - JWT_SECRET
+      - JWT_EXPIRATION
+    ports:
+      - "3000:3000"
+      - "9229:9229"  # Debug port
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - grocery-network
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - ./logs:/app/logs
+    command: npm run dev
+
+volumes:
+  postgres_data:
+
+networks:
+  grocery-network:
+    driver: bridge

@@ -13,6 +13,10 @@ InventoryHistory.init(
     itemId: {
       type: DataTypes.INTEGER,
       allowNull: false,
+      references: {
+        model: 'items',
+        key: 'id'
+      },
       comment: 'Reference to the item',
     },
     action: {
@@ -43,7 +47,11 @@ InventoryHistory.init(
     performedBy: {
       type: DataTypes.INTEGER,
       allowNull: false,
-      comment: 'ID who performed the action',
+      references: {
+        model: 'actors',
+        key: 'id'
+      },
+      comment: 'Admin user ID who performed the action',
     },
   },
   {
