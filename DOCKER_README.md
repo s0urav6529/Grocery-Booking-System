@@ -1,6 +1,6 @@
 # Grocery Booking System - Docker Setup
 
-A complete grocery booking system with user authentication, item management, and inventory control, containerized with Docker for easy deployment and scaling.
+A complete grocery booking system with user authentication, item management, pending multi-item order bookings, and inventory control, containerized with Docker for easy deployment and scaling.
 
 ## 🚀 Quick Start
 
@@ -97,6 +97,8 @@ docker-compose exec -T postgres psql -U postgres -d grocery_booking_db < backup.
 The application uses PostgreSQL with Sequelize ORM. The database schema includes:
 - **Actors**: User authentication and authorization
 - **Items**: Grocery items with inventory management
+- **Orders**: User orders with multiple items in a single booking
+- **OrderItems**: Individual item lines within an order
 - **InventoryHistory**: Audit trail for inventory changes
 
 ## 🏗️ Architecture
@@ -204,11 +206,13 @@ docker-compose logs -f
 - `POST /api/auth/signup` - User registration
 - `POST /api/auth/login` - User login
 
-### Item Management (Admin)
+### Item Management Endpoints (Public)
 - `GET /api/items` - List items with search/pagination
+- `GET /api/items/slug/:slug` - Get item by slug
+
+### Item Management (Admin)
 - `POST /api/items` - Create new item
 - `GET /api/items/id/:id` - Get item by ID
-- `GET /api/items/:slug` - Get item by slug
 - `PATCH /api/items/:id` - Update item
 - `DELETE /api/items/:id` - Delete item
 
@@ -217,3 +221,8 @@ docker-compose logs -f
 - `POST /api/items/:id/inventory/reduce` - Reduce stock
 - `PUT /api/items/:id/inventory` - Set stock quantity
 - `GET /api/items/:id/inventory/history` - Inventory history
+
+### Order Management (User)
+- `POST /api/orders` - Create a pending order with multiple grocery items
+- `GET /api/orders` - List orders of a user with pagination
+- `GET /api/orders/id/:id` - Get order by ID (user&admin)
