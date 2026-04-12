@@ -3,6 +3,7 @@ const express = require("express");
 const cors = require("cors");
 const morgan = require('morgan');
 const { actorRoute, authRoute, itemRoute } = require("./routes/init");
+const { apiSecure } = require("./middlewares/init");
 const dotenv = require('dotenv').config();
 
 module.exports = async(app) => {
@@ -16,10 +17,7 @@ module.exports = async(app) => {
         app.use(morgan("dev"));
     }
 
-    app.use("/api/auth", authRoute);
-    app.use("/api/actors", actorRoute);
-    app.use("/api/items", itemRoute);
-
+    
     // Health check endpoint
     app.get("/api/health", (req, res) => {
         res.status(200).json({
@@ -27,6 +25,12 @@ module.exports = async(app) => {
             message: "API is healthy"
         });
     });
+    
+    app
+        .use(apiSecure.apiAuth)
+        .use("/api/auth", authRoute)
+        .use("/api/actors", actorRoute)
+        .use("/api/items", itemRoute)
 
     // 404 handler
     app.use((req, res) => {
