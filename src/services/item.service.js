@@ -83,8 +83,8 @@ class ItemService {
     /**
      * Create new item with slug generation and duplicate checks
      */
-    static async createItem(itemData) {
-
+    static async createItem(itemData, actorId) {
+        let transaction;
         try {
 
             // Validate required fields
@@ -142,7 +142,7 @@ class ItemService {
                 counter++;
             }
 
-            console.log('Final slug for new item:', slug);
+            transaction = await sequelize.transaction();
 
             const newItem = await Item.create({
                 name: itemData.name,
@@ -153,10 +153,23 @@ class ItemService {
                 sku: itemData.sku || null,
                 unit: itemData.unit || 'pcs',
                 isActive: itemData.isActive !== undefined ? itemData.isActive : true
-            });
+            }, { transaction });
 
+            // create new inventory history record for initial stock
+            await InventoryHistory.create({
+                itemId: newItem.id,
+                action: 'add',
+                quantityChange: newItem.quantity,
+                previousQuantity: 0,
+                newQuantity: newItem.quantity,
+                reason: 'Initial stock on item creation',
+                performedBy: actorId || null, // Use the provided actor ID or set to null if not available
+            }, { transaction });
+
+            await transaction.commit();
             return newItem;
         } catch (error) {
+            if (transaction) await transaction.rollback();
             throw error;
         }
     }
@@ -203,7 +216,7 @@ class ItemService {
 
             if (updateData.description !== undefined) item.description = updateData.description;
             if (updateData.price !== undefined) item.price = parseFloat(updateData.price);
-            if (updateData.quantity !== undefined) item.quantity = parseInt(updateData.quantity);
+            // Quantity updates must use inventory endpoints only
             if (updateData.sku !== undefined) item.sku = updateData.sku;
             if (updateData.unit !== undefined) item.unit = updateData.unit;
             if (updateData.isActive !== undefined) item.isActive = updateData.isActive;
@@ -273,6 +286,8 @@ class ItemService {
      * Add stock to item inventory
      */
     static async addStock(itemId, quantity, adminId, reason = 'Stock addition') {
+        const transaction = await sequelize.transaction();
+
         try {
             const item = await this.getItemById(itemId);
 
@@ -286,11 +301,9 @@ class ItemService {
             const previousQuantity = item.quantity;
             const newQuantity = previousQuantity + quantity;
 
-            // Update item quantity
             item.quantity = newQuantity;
-            await item.save();
+            await item.save({ transaction });
 
-            // Record inventory history
             await InventoryHistory.create({
                 itemId,
                 action: 'add',
@@ -299,7 +312,9 @@ class ItemService {
                 newQuantity,
                 reason,
                 performedBy: adminId,
-            });
+            }, { transaction });
+
+            await transaction.commit();
 
             return {
                 item,
@@ -308,6 +323,7 @@ class ItemService {
                 quantityAdded: quantity,
             };
         } catch (error) {
+            await transaction.rollback();
             throw error;
         }
     }
@@ -316,6 +332,8 @@ class ItemService {
      * Reduce stock from item inventory
      */
     static async reduceStock(itemId, quantity, adminId, reason = 'Stock reduction') {
+        const transaction = await sequelize.transaction();
+
         try {
             const item = await this.getItemById(itemId);
 
@@ -336,20 +354,20 @@ class ItemService {
                 };
             }
 
-            // Update item quantity
             item.quantity = newQuantity;
-            await item.save();
+            await item.save({ transaction });
 
-            // Record inventory history
             await InventoryHistory.create({
                 itemId,
                 action: 'reduce',
-                quantityChange: -quantity, // Negative for reduction
+                quantityChange: -quantity,
                 previousQuantity,
                 newQuantity,
                 reason,
                 performedBy: adminId,
-            });
+            }, { transaction });
+
+            await transaction.commit();
 
             return {
                 item,
@@ -358,6 +376,7 @@ class ItemService {
                 quantityReduced: quantity,
             };
         } catch (error) {
+            await transaction.rollback();
             throw error;
         }
     }
@@ -366,6 +385,8 @@ class ItemService {
      * Set item quantity directly
      */
     static async setStock(itemId, quantity, adminId, reason = 'Stock adjustment') {
+        const transaction = await sequelize.transaction();
+
         try {
             const item = await this.getItemById(itemId);
 
@@ -378,11 +399,9 @@ class ItemService {
 
             const previousQuantity = item.quantity;
 
-            // Update item quantity
             item.quantity = quantity;
-            await item.save();
+            await item.save({ transaction });
 
-            // Record inventory history
             await InventoryHistory.create({
                 itemId,
                 action: 'set',
@@ -391,7 +410,9 @@ class ItemService {
                 newQuantity: quantity,
                 reason,
                 performedBy: adminId,
-            });
+            }, { transaction });
+
+            await transaction.commit();
 
             return {
                 item,
@@ -400,6 +421,7 @@ class ItemService {
                 quantityChange: quantity - previousQuantity,
             };
         } catch (error) {
+            await transaction.rollback();
             throw error;
         }
     }

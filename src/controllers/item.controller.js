@@ -107,7 +107,7 @@ class ItemController {
   static async createItem(req, res) {
     try {
       const { name, description, price, quantity, sku, unit, isActive } = req.body;
-
+      const actorId = req.account.id; // From auth middleware
       const newItem = await ItemService.createItem({
         name,
         description,
@@ -116,7 +116,7 @@ class ItemController {
         sku,
         unit,
         isActive
-      });
+      }, actorId);
 
       return res.status(201).json({
         success: true,
