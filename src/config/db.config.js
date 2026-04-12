@@ -30,11 +30,13 @@ const DB = async () => {
     console.log("Database connected successfully");
 
     // Import models
-    const { Actor, Item, InventoryHistory } = require('../models/init');
+    const { Actor, Item, Order, OrderItem, InventoryHistory } = require('../models/init');
 
     // Sync models in correct order (dependencies first)
     await Actor.sync();
     await Item.sync();
+    await Order.sync();
+    await OrderItem.sync();
     await InventoryHistory.sync();
 
     console.log("Database synced successfully");

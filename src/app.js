@@ -2,7 +2,7 @@
 const express = require("express");
 const cors = require("cors");
 const morgan = require('morgan');
-const { actorRoute, authRoute, itemRoute } = require("./routes/init");
+const { actorRoute, authRoute, itemRoute, orderRoute } = require("./routes/init");
 const { apiSecure } = require("./middlewares/init");
 const dotenv = require('dotenv').config();
 
@@ -31,6 +31,7 @@ module.exports = async(app) => {
         .use("/api/auth", authRoute)
         .use("/api/actors", actorRoute)
         .use("/api/items", itemRoute)
+        .use("/api/orders", orderRoute)
 
     // 404 handler
     app.use((req, res) => {

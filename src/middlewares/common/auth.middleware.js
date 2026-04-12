@@ -58,7 +58,35 @@ const requireAdmin = async (req, res, next) => {
 };
 
 /**
- * @desc Allow admin and user roles
+ * @desc Allow user roles
+ */
+const requireUser = async (req, res, next) => {
+    try {
+        if (!req.account) {
+            return res.status(401).json({
+                success: false,
+                message: "Authentication required"
+            });
+        }
+
+        if (req.account.role !== "user") {
+            return res.status(403).json({
+                success: false,
+                message: "User access required"
+            });
+        }
+
+        next();
+    } catch (error) {
+        return res.status(403).json({
+            success: false,
+            message: "Access denied"
+        });
+    }
+};
+
+/**
+ * @desc Allow user and admin roles
  */
 const requireAdminAndUser = async (req, res, next) => {
     try {
@@ -85,4 +113,4 @@ const requireAdminAndUser = async (req, res, next) => {
     }
 };
 
-module.exports = { requireAdmin, requireAdminAndUser, isLogin };
+module.exports = { requireAdmin, requireUser, requireAdminAndUser, isLogin };
