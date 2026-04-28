@@ -13,64 +13,86 @@ class OrderService {
       };
     }
 
-    const itemIds = items.map((item) => item.itemId);
-    const existingItems = await Item.findAll({ where: { id: itemIds } });
-    const itemMap = existingItems.reduce((map, item) => {
-      map[item.id] = item;
-      return map;
-    }, {});
-
-    let totalPrice = 0;
-    const orderItems = [];
-
+    // Validate basic shape before acquiring locks
     for (const requestedItem of items) {
-      const { itemId, quantity } = requestedItem;
-      const parsedQuantity = parseInt(quantity, 10);
-
-      if (!itemId || parsedQuantity <= 0) {
+      const parsedQuantity = parseInt(requestedItem.quantity, 10);
+      if (!requestedItem.itemId || parsedQuantity <= 0) {
         throw {
           status: 400,
           message: 'Each item must include a valid itemId and positive quantity',
         };
       }
-
-      const item = itemMap[itemId];
-      if (!item) {
-        throw {
-          status: 404,
-          message: `Item not found: ${itemId}`,
-        };
-      }
-
-      if (!item.isActive) {
-        throw {
-          status: 400,
-          message: `Item is not available: ${item.name}`,
-        };
-      }
-
-      if (parsedQuantity > item.quantity) {
-        throw {
-          status: 400,
-          message: `Insufficient stock for item: ${item.name}`,
-        };
-      }
-
-      const unitPrice = parseFloat(item.price);
-      const subtotal = unitPrice * parsedQuantity;
-      totalPrice += subtotal;
-
-      orderItems.push({
-        itemId,
-        quantity: parsedQuantity,
-        unitPrice,
-        subtotal,
-      });
     }
 
-    const transaction = await sequelize.transaction();
+    const itemIds = items.map((item) => item.itemId);
+
+    // Start a SERIALIZABLE transaction so that concurrent reads of the same
+    // rows are serialised and cannot both pass the stock check simultaneously.
+    const transaction = await sequelize.transaction({
+      isolationLevel: sequelize.constructor.Transaction.ISOLATION_LEVELS.SERIALIZABLE,
+    });
 
     try {
+      // Acquire a pessimistic write-lock on every item row involved in this
+      // order (FOR UPDATE / LOCK IN SHARE MODE depending on dialect).  Any
+      // concurrent request that tries to lock the same rows will block here
+      // until this transaction commits or rolls back.
+      const existingItems = await Item.findAll({
+        where: { id: itemIds },
+        lock: transaction.LOCK.UPDATE,
+        transaction,
+      });
+
+      const itemMap = existingItems.reduce((map, item) => {
+        map[item.id] = item;
+        return map;
+      }, {});
+
+      let totalPrice = 0;
+      const orderItems = [];
+
+      for (const requestedItem of items) {
+        const { itemId, quantity } = requestedItem;
+        const parsedQuantity = parseInt(quantity, 10);
+
+        const item = itemMap[itemId];
+        if (!item) {
+          throw {
+            status: 404,
+            message: `Item not found: ${itemId}`,
+          };
+        }
+
+        if (!item.isActive) {
+          throw {
+            status: 400,
+            message: `Item is not available: ${item.name}`,
+          };
+        }
+
+        // Stock check now happens on the locked row — safe from race conditions
+        if (parsedQuantity > item.quantity) {
+          throw {
+            status: 400,
+            message: `Insufficient stock for item: ${item.name}`,
+          };
+        }
+
+        const unitPrice = parseFloat(item.price);
+        const subtotal = unitPrice * parsedQuantity;
+        totalPrice += subtotal;
+
+        orderItems.push({
+          itemId,
+          quantity: parsedQuantity,
+          unitPrice,
+          subtotal,
+        });
+
+        // Decrement stock atomically within the same transaction
+        await item.decrement('quantity', { by: parsedQuantity, transaction });
+      }
+
       const order = await Order.create(
         {
           actorId,
@@ -80,8 +102,6 @@ class OrderService {
         },
         { transaction }
       );
-
-      // console.log('Order created with ID:', order.dataValues);
 
       const orderItemsPayload = orderItems.map((orderItem) => ({
         ...orderItem,
