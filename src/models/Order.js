@@ -28,7 +28,7 @@ Order.init(
     status: {
       type: DataTypes.ENUM('pending', 'confirmed', 'cancelled'),
       allowNull: false,
-      defaultValue: 'confirmed',
+      defaultValue: 'pending',
       comment: 'Order status',
     },
     note: {
