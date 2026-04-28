@@ -1,3 +1,4 @@
+const { Op } = require('sequelize');
 const { Item, InventoryHistory } = require('../models/init');
 const { generateSlug } = require('../utils/slug.utils');
 const { sequelize } = require('../config/db.config');
@@ -199,13 +200,13 @@ class ItemService {
                 let newSlug = generateSlug(updateData.name);
                 let counter = 1;
                 let existingSlug = await Item.findOne({
-                    where: { slug: newSlug, id: { [require('sequelize').Op.ne]: itemId } },
+                    where: { slug: newSlug, id: { [Op.ne]: itemId } },
                 });
 
                 while (existingSlug) {
                     newSlug = `${generateSlug(updateData.name)}-${counter}`;
                     existingSlug = await Item.findOne({
-                        where: { slug: newSlug, id: { [require('sequelize').Op.ne]: itemId } },
+                        where: { slug: newSlug, id: { [Op.ne]: itemId } },
                     });
                     counter++;
                 }
@@ -254,9 +255,9 @@ class ItemService {
 
             const { count, rows } = await Item.findAndCountAll({
                 where: {
-                    [require('sequelize').Op.or]: [
-                        { name: { [require('sequelize').Op.iLike]: `%${searchTerm}%` } },
-                        { slug: { [require('sequelize').Op.iLike]: `%${searchTerm}%` } },
+                    [Op.or]: [
+                        { name: { [Op.iLike]: `%${searchTerm}%` } },
+                        { slug: { [Op.iLike]: `%${searchTerm}%` } },
                     ],
                 },
                 order: [['createdAt', 'DESC']],

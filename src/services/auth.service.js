@@ -1,5 +1,6 @@
 const { Actor } = require('../models/init');
 const { hashedPassword, verifyPassword, createToken } = require('../utils/auth.utils');
+const { response } = require('../utils/init');
 
 class AuthService {
   /**
@@ -38,18 +39,18 @@ class AuthService {
 
       return newActor;
     } catch (error) {
-      throw new Error(`Error creating actor: ${error.message}`);
+      throw response.sendThrowError(500, `Error creating actor: ${error.message}`);
     }
   }
 
   /**
    * Verify actor password
    */
-  static async verifyActorPassword(inputPassword, hashedPassword) {
+  static async verifyActorPassword(inputPassword, hashedPass) {
     try {
-      return await verifyPassword(inputPassword, hashedPassword);
+      return await verifyPassword(inputPassword, hashedPass);
     } catch (error) {
-      throw new Error(`Error verifying password: ${error.message}`);
+      throw response.sendThrowError(500, `Error verifying password: ${error.message}`);
     }
   }
 
@@ -72,77 +73,57 @@ class AuthService {
    * Signup service
    */
   static async signup(contact, password, role) {
-    try {
-      // Check if contact already exists
-      const existingActor = await this.contactExists(contact);
-      if (existingActor) {
-        throw {
-          status: 409,
-          message: 'Contact already registered'
-        };
-      }
-
-      // Check if admin already exists
-      if (role === 'admin') {
-        const adminExists = await this.adminExists();
-        if (adminExists) {
-          throw {
-            status: 403,
-            message: 'Admin account already exists. Only one admin is allowed'
-          };
-        }
-      }
-
-      // Create new actor
-      const newActor = await this.createActor(contact, password, role);
-
-      // Generate token
-      const token = this.generateToken(newActor);
-
-      return {
-        contact: newActor.contact,
-        role: newActor.role,
-        token
-      };
-    } catch (error) {
-      throw error;
+    // Check if contact already exists
+    const existingActor = await this.contactExists(contact);
+    if (existingActor) {
+      throw response.sendThrowError(409, `Contact already registered`);
     }
+
+    // Check if admin already exists
+    if (role === 'admin') {
+      const adminExists = await this.adminExists();
+      if (adminExists) {
+        throw response.sendThrowError(403, 'Admin account already exists. Only one admin is allowed');
+      }
+    }
+
+    // Create new actor
+    const newActor = await this.createActor(contact, password, role);
+
+    // Generate token
+    const token = this.generateToken(newActor);
+
+    return {
+      contact: newActor.contact,
+      role: newActor.role,
+      token
+    };
   }
 
   /**
    * Login service
    */
   static async login(contact, password) {
-    try {
-      // Find actor by contact
-      const actor = await this.findByContact(contact);
-      if (!actor) {
-        throw {
-          status: 401,
-          message: 'Invalid contact or password'
-        };
-      }
-
-      // Verify password
-      const isPasswordValid = await this.verifyActorPassword(password, actor.password);
-      if (!isPasswordValid) {
-        throw {
-          status: 401,
-          message: 'Invalid contact or password'
-        };
-      }
-
-      // Generate token
-      const token = this.generateToken(actor);
-
-      return {
-        contact: actor.contact,
-        role: actor.role,
-        token
-      };
-    } catch (error) {
-      throw error;
+    // Find actor by contact
+    const actor = await this.findByContact(contact);
+    if (!actor) {
+      throw response.sendThrowError(401, 'Invalid contact or password');
     }
+
+    // Verify password
+    const isPasswordValid = await this.verifyActorPassword(password, actor.password);
+    if (!isPasswordValid) {
+      throw response.sendThrowError(401, 'Invalid contact or password');
+    }
+
+    // Generate token
+    const token = this.generateToken(actor);
+
+    return {
+      contact: actor.contact,
+      role: actor.role,
+      token
+    };
   }
 }
 

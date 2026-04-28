@@ -1,75 +1,26 @@
 const AuthService = require('../services/auth.service');
+const { asyncHandler, response } = require('../utils/init');
 
 class AuthController {
   /**
    * Signup endpoint handler
    * Delegates business logic to AuthService
    */
-  static async signup(req, res) {
-    try {
-      const { contact, password, role } = req.body;
-
-      // Call service to handle signup
-      const result = await AuthService.signup(contact, password, role);
-
-      return res.status(201).json({
-        success: true,
-        message: 'Signup successful',
-        data: result
-      });
-    } catch (error) {
-      console.error('Signup error:', error);
-
-      // Handle service errors
-      if (error.status) {
-        return res.status(error.status).json({
-          success: false,
-          message: error.message
-        });
-      }
-
-      return res.status(500).json({
-        success: false,
-        message: 'Internal server error',
-        error: error.message
-      });
-    }
-  }
+  static signup = asyncHandler(async (req, res) => {
+    const { contact, password, role } = req.body;
+    const result = await AuthService.signup(contact, password, role);
+    return response.sendSuccess(res, 201, 'Signup successful', result);
+  });
 
   /**
    * Login endpoint handler
    * Delegates business logic to AuthService
    */
-  static async login(req, res) {
-    try {
-      const { contact, password } = req.body;
-
-      // Call service to handle login
-      const result = await AuthService.login(contact, password);
-
-      return res.status(200).json({
-        success: true,
-        message: 'Login successful',
-        data: result
-      });
-    } catch (error) {
-      console.error('Login error:', error);
-
-      // Handle service errors
-      if (error.status) {
-        return res.status(error.status).json({
-          success: false,
-          message: error.message
-        });
-      }
-
-      return res.status(500).json({
-        success: false,
-        message: 'Internal server error',
-        error: error.message
-      });
-    }
-  }
+  static login = asyncHandler(async (req, res) => {
+    const { contact, password } = req.body;
+    const result = await AuthService.login(contact, password);
+    return response.sendSuccess(res, 200, 'Login successful', result);
+  });
 }
 
 module.exports = AuthController;
